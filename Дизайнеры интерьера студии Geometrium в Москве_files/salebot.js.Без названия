@@ -1,0 +1,766 @@
+// TO DO Удалить все не нужные console.log
+// import "https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"
+// var jquery = document.createElement('script');
+// jquery.src = 'https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js';
+// document.head.prepend(jquery);
+var SaleBotPro = (function () {
+    // var jquery = document.createElement('script');
+    // jquery.src = 'https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js';
+    // document.head.prepend(jquery);
+    try{
+        var domains = {
+            "salebot.zmservice.ru": "https://salebot.zmservice.ru",
+            "localhost": "http://localhost:3000",
+            "salebot.ai": "https://salebot.ai"
+        }
+        var domain_with_protocol = domains[location.hostname] || "https://salebot.pro"
+        // var domain_with_protocol = "http://localhost:3000"
+        var newDesign = false;
+        function get_cookie(name) {
+            let matches = document.cookie.match(new RegExp(
+                "(?:^|; )" + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + "=([^;]*)"
+            ));
+            return matches ? decodeURIComponent(matches[1]) : undefined;
+        }
+        var res,
+            showPrompt = false,
+            chatHidesState = false;
+        var promptClass,
+            bottomStyle,
+            alignStyle;
+        return {
+            open: function () {
+                SaleBotPro.hidePrompt()
+                const v = document.getElementById('parent_frame').contentWindow;
+                v.postMessage('salebot_open_inner', `${domain_with_protocol}`);
+                // if(get_align(res.online_chat_align)){
+                //     $('#small_preview_salebot').css('width',  "0px")
+                // }else{
+                //     $('#small_preview_salebot').css({'width' :"0px", "left": "-60px"})
+                // }
+            },
+            hidePreview: function () {
+                document.getElementById('parent_frame').style.maxHeight = "0"
+                SaleBotPro.hidePrompt()
+                let element = document.getElementById('small_preview_salebot')
+                let right = parseInt(window.getComputedStyle(element).right)
+                let left= parseInt(window.getComputedStyle(element).left)
+                if(left < right ){
+                    if(document.getElementById('small_preview_salebot')){
+                        element.style.left = "-60px"
+                    }
+                } else {
+                    if(document.getElementById('small_preview_salebot')){
+                        element.style.right = "-60px"
+                    }
+                }
+            },
+            showPreview: function () {
+                document.getElementById('parent_frame').style.maxHeight =  newDesign ? "0" : "46px"
+                let element = document.getElementById('small_preview_salebot')
+                let right = parseInt(window.getComputedStyle(element).right)
+                let left= parseInt(window.getComputedStyle(element).left)
+                if(left < right ){
+                    if(document.getElementById('small_preview_salebot')){
+                        element.style.left = "0"
+                    }
+                } else {
+                    if(document.getElementById('small_preview_salebot')){
+                        element.style.right = "0"
+                    }
+                }
+            },
+            createPrompt: function () {
+                if(document.getElementById('salebot_prompt_id')) return
+                let prompt = document.createElement("div")
+                prompt.id = "salebot_prompt_id"
+                prompt.innerHTML = ``
+                document.body.appendChild(prompt)
+            },
+            showPrompt: function (res, bottomStyle, alignStyle) {
+                let promptDiv  = document.getElementById('salebot_prompt_id')
+                if(!promptDiv) return
+                let svgRobotLight = `<svg width="42" height="42" viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+                                    <circle cx="21" cy="21" r="21" fill="url(#pattern0)"/>
+                                    <defs>
+                                    <pattern id="pattern0" patternContentUnits="objectBoundingBox" width="1" height="1">
+                                    <use xlink:href="#image0_4760_12866" transform="translate(0 -0.0046729) scale(0.0046729)"/>
+                                    </pattern>
+                                    <image id="image0_4760_12866" width="214" height="216" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAANYAAADYCAYAAACX6R1eAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAABgDSURBVHgB7Z1LbFtXese/Q0pJMHAmygNo5LYwvRi7ixahpKRIZlHRBRqkqBXJ2TSZLEwBUzlG0EauA3SKLkRt2gaIY3sRpJYLSNqM08XE8lgBmsxCVDfOIH7QmCwaZ2G6KKxBO0nksQfwWCbvnP+9vjZF8XHv5bmPc+73A2SRFGVb1P3z+873JGIYhmEYHRDEREthfoBu3x6gjUyeLDEgfwU7SFg554siR5YlH6MB5y49uN0Ki6rO80T13gPr9u06rcvb1ygjbwv52OdTFWIihYUVFhDQbzZyVKNReYFDMPKD8vIVz1EcQIQQnaAK1a2q/D9dpm19FSpPrhOjHBaWKp6by9siElI8FhViE5BfLCk0ActnLdliY+umBBZWUJ7/IEd3suPyFSzIe/gYIDOABStLwZUpS6sstGCwsLwC1+7W3by8NS5dqQltLFLPSLeRRFm6kYt0/m/KxHiChdUJV0yWtV/emyBzrFJQYM2WpNjO0IUDS8S0hYXVimdPFgiWybKKxGJqhyMytmQtYWG52NbpzjTVxf70uHmqgLtIJeqvr9JnB6vEsLBs62RZb5Hj6jG9s8BWLM3CsgVFM/LdtkCMeuwwvnVMnsUWKYWkT1jDc0X5U0tBsbsXDffcxJQJLD3CYkHFTLoEZr6wWFAJIx0CM1dYfIZKOFJgIjNpapDDPGGh1Gijb54FpQ0L1F+bNS1Mb46w3DyUJRA656Subghrls4fKJEhmCEsJxclrRSfo/QG7mFduocHy6Q5egsLVurmRkneeosYk9DePdRXWGylDEdv66WfsNhKpQtUb5w/cIg0Qy9h2RG/7AqxlUoZ0nr11/fo5BpmSBeePTEtRXWJWFQpROTs3/2wvAY0IfkWi10/phFNXMNkCwuu393saXu6EcPcJ/muYXJdwefez9vnKRYVswUhXcPMin2NJJRkCuu5D4pU7+fzFNMBkbOvkYSeu7KUNJ49USIrc5QYxgtCvES/v1fQ9eUyJYhkCWtk7ph8pf6BGMYXopA0cSUneDFyYkH+d/YTwwRngS5MTVICiF9YdlX6BgcpGDVg1ka9fw9V4p1JH6+wWFRMGCRAXPEJi0XFhEnM4opHWCwqJgpiFFc8eSwWFRMFWKmU2VihGIheWIj+saiYqIC4RubmKWKizWMh+UuCi2mZqMnLPNeAzHN9QhERnbDsigoxQwwTC+L5KJPI0QQv0EtlCS5TYhKAVYxiWGj4wkIFslNQyzDJILMxRJ+/GeoK2HCDF+inqvefJoZJEvW+0/a1GSLhCovnUzCJRGAx+2nKz4c22DU8YdmV6iwqJqEgDN93J7RgWjhRQQQriCOATNKRkcLBvTdobfkzUoz64IUzogzBCp6fHoDCyCCNF3KU3/UEDTz6MK3f/C1VrnxDZ8pVKl9YI0Y569RfG1I9P0O9sEbmrhK7gL7J73qSjh5+wRZWO8oXrtNk6b+ounaTGJVYVao9NKSyplDtGYvPVYEo7t1Fl378SkdRgcLIdvt5ECGjEpFTfd5SZ7GcWeqxFDzqDEQCsfhh/eYdGvrBR2y5VCNqe1TNildjsXCuchYUMD45feRF8svAow/RfOnPiFGMlZlXFYJXI6yNLO/4DUBxbBflBrdREOAWdnMdGb8IZS5h78KCCyivEWJ8Mz6ao14YZWGpxxLT9OwHBeqR3oXFLmBgctuDWSsXDmKEhAKXsDdh2f1V7AIGBWelOL+faYfIUeZuT32DwYVlByy4uoIxFGFN91KoG1xYTsCC6YFeKym4EiNUBuQ1HviYE0xYHLBQwuLZK9QLZ8rXiAmVQtBARjBhccBCCbA4QZO8S+UqVa58TUzIWME8M//CGp4rEgcslDFZWiW/oDD30JFzxERCgUZO+N4p4F9YgvhspRBYrclZ7+KCqPYcWJaW7hYxkVEin/irFYS1EsRuYAggp7VyYi/lBh9t+xyIyqkRZFFFj78hNP4sFlur0Khev0U7xz6kibc/bXt2WpLBChZVbJT8PNm7sPhsFQmI9MEqtQqlox+LiQuR83PW8i4stlaRcvzUL7Y8lt/9FDGxUvL6RG/CYmsVOWjHb2ZgG5cwxYvIec1rebRYPG89aqrXt+a38rufICZmPOa1ugsLVRbC4u0gMdCcPB7Y9jAxseOpGqO7sCyLF27HBFrwG8ltf5Qr2pOAlenqwXUWllPdWyQmFlqF3R9jq5UAxES3fq3OwrqTLRATG3zOSjBd+rU6C4tD7LFyrUWBLkcGk4JV7PTV9sJyWkNyxMRG8xkLcC4rIQjqGHpvLywOWsQO57ISTr1vvN2XOrmCE8TECp+xEo6Q7mCbIEZrYY38O0TFSw1iBuH1LY8NfpdD7slhgPput8zxtrFY9bYmjokGiOr0u1un5EJUR//+hY7tJUyEWNmWR6bW/Vgjc98SWyylYCUPVvOg7+qZXU/ZZyXcxuOtLJAX4bRr63ddSLSi4DkIglyWOTGc2dDTxShlnWr9O5s3lfRteZqz3IBF1SMY//zMriftz/ndT4ZiYdr9nfcfH9n6NYitcuVXdlsKxMaTnnrGdQfLjQ9uFRZHAwPhWqT9e3fRRCGX2HMQrCQ+8H8EEBr6vM6sVu1GSiYATnSw3PjQVleQF8f5AhYp6WLyClxGTH9aXL7ClswPFlXp4tTOxoc2C+u5uTzV6RIxHYF12r/3e/a2EFPnp8OSleYu2CJjPFDP5OjSD++b/M3LvZ8e+2sptZeIaQkE9aNink7985/bFurpJ79DpgLri5+xuHc3PS5vQ2jrt+4Q0w6rSmtnf+7e2yys7WM/kn/+ETGbaBTUS9//A3rk4SylBQgMu7ggMrg3n33xf8S0QFi3aW35P+7f3fRFDrNvAWeo+VIh8II402AXsS3rdGHqcffOA2Hx+WoTSNDOz4zy1sQ2LJy9QrNzF3kPciO1jSGqvFnBzQfh9hrlFa761prp1/6YZqZGIonyIWGLs4udzL0e/CLF/9VNNsO64naYIHADF5GtVwOZ/lH5Z5OwBKW+jAkX47HDz9vh8zCAiNAVjJA2Bm9WvvymZc+VCiAwN0ENASDHplpsyIctlByrfui9cy3bXFKFoPyDmy7DJy+leWgMXD9nxLPasxTEtLD8lS2m1ZhzQ9hZ7FiaQeWVILC4zkz5FLuGDfksR1gofc9ufEspBREvnKdUuX5JElM7XJFNjO5QZslgsSZny+mu4Kj1P466QUdYTn3gCqWQkjxLzUwNkwogqGOnvqDj8kMXtwjuHCwYzpSqrNisPHeVZGAjldwLYDgJmafHxtOYGFYlKgQdpo+co9f+acW2ULfv1EgX8AaAqne8GeC8h4LhXi0YznR4x05lWZTI/jcSxY6wBl9+Vb4Sz1OKUCEqWKh/Xbxs77f6+Rf/T7rjCswe6LC9t8hiesUlIKxPHGFtfxkVFzlKCSpEhfPTnjc+pk/O/a9WFsoLsLqodncq9oPXQqZSXML6JSow7lmssZJ8BVJRcdGrqOD2Tbz9M3pHWirTBNUIXESsFOrVPUyduCzxiLRYx+9ZrLFjlAKQ+P2Xv/1TCgqs1F/+3X/Sl9UblBbgHvZqvSCuG1KoqagzhIH6vVeksFDKZNEbZDi4KE4feZGCguDEofc+M9pKtcO1XrhqgpZ4vfT9P7RdzJRspPy3jDRdxruA9mCWgKJCgKIgE5/OoT7dIIy+7+1PA6cSMBwnFUNwslY+Q3UrR4YTtKIC5ymsLU1qkjcOkPwdev0ngSoskIA/feQvyHikscpI876DDKZkJz6Dicop0eFl2s30Ur4El/zoYcMzO5aVw1xBY11Bp6LAfwSQRdWdXsQ1/dqfmN2OIyAsYa4riAZFv+BMxaLyhiuuIGeu+ZmC0RN94QoaabGCuoDIUbGovANxIaDhF1R2vCXTH4aSEzRyckU6hQUyCEQBr/70VfILmvZmFRePooJ83K4gdwayxDFazB3RhovZGXF2TXlzInKERw+/QH7ZOfahea0mFlUEDc9dtXf9GMR8aZSKPpsV0WqOmj9VIKGKaCQaDJuJsvq7XaUJGi6DunHtwM/r9+yEYaF7DnxMRmFRtftyb83AL9avqBCswMWuEkS+WokKoEVjOgI3CNayXfDGTpi/qzb0jV4sv0JFVYaJgYyMadYKF61f4AKqPFfBFe0m7ijOF91eC1zUOxQmbOHqBnmDUtUPlxgEDRhlsZz5Dv7e/WCtFpe/IpW0s1SNQHxhRsXcoTLdKIw8TSpBo6ffM6SBVsssYe0f8z8EpqTYBQReBfPYtvAmKYU9pakTbLU6r0rVCi/uVzNhWCvGaREJYrVMymsZI6wgI8vCsFaMA1ps/GJSXssYYRUDuIFnVnkfVFggT+Y3QljcG848xzgwQljOnDx/VRZ4R039gMkQcYbUfO3re+DOmxLEgLDWSXPG720n9AMvVgufIO7gqDHCsvQXVpB3Ob/vpox/gvSxTRQM6GIyofIC7kOQWQzcvBg+wfq1njIiOojqdq0tlpdkbDN8tooGvM5BxIWiZa0RsFhCb1dwVOY//IKeKya55Hc/RbqTsXenaoypy7XTTBAvJFlY69qfsVhY5oFzltZYmSrGn1VJU5wthua2d6cVA36vsFiWtuUHbK3MRev5g0IgeJHRPo/FmMeO7Wo3a0ZKvS6FVduokKbkEvrio+Gv+3NuhrZ/2P37vaQVkjo4Z2Cbxq6gtXFDuoKPsMVSDMqlulV2LEVQAHysy1hsiI8T5SFQebOSwb5UeymxhuxIsB8+WVptmxyF6GYjaFk5fuoXbQXuzk9MKqio0ZJ7WnLC7YK0dQeDEEV3rTsFacFun3AS0hAaesBUT0dqB/4NzJ7HRChX5O6eZDwehRs4sC381zpRCEdYffYdhNyFRWnBDeeGfXHjrAXLNUnxMmvPS4y+qTOV6RBL2EbqXoJY7+qLIKRinUzMpDMd4mjJEVaW1E2q1ART+n6SzDNpFJZFDRZro79KKcOIvp+EMxGgAVV7rP7L+OQIS+PIYFBMmwqUNExqs/cMrBW0RI0zLwSVKWUYvO0idkwaDOMZ8SBW8UBYVrpC7gAL0NhqqQfWKsjwVANYcm88EFYKAxgQlXFzwxMAXtMgu8m0p3b3snvzgbA+n4LF0qq8SUUeyvi1nRETZNuLIayjlMm909zoWCaNuHFLTYv96Xdf5LyWAuACBllP2wrUMeqFVW68t1lYVvoCGAAuIZamsbiCA1E5r2EKXUBgiXLj3c3CqtfOkEaoLElCCwqLKxhhiEq7PdD1jU0xis3Cqhys6pTP8tL35AdXXNyZ7B2cqcKwVDd0GlFnyTB7w/kKtBgmI5ZIE8JYCg1xXfrxK1TiaGFXjh1+ITT3T6+F35vdQLBVWJm72riDQQdCegFrRq/+9DWOGLYAr8nVs6+FlmD32v2cGCxaaH5oq7DuPqJV2L3y5TcUFq5rOD8zymcveuD2hR2k0Gyu/jpdmtqSA94qLKfWSRt3sHzhOoUNdm9dPfuqvKD+KtCCO91pFFQUFlyrTTBWa630tXyyqC2SlS2SBlyO8N3NWUK9XZ6/RmxBHz/1hbFbS5xF6dttdy/qsi+t5nBkWsckRMsn5+cHKLtxVd4aIA34dmV/bDV/iExCZGdWq/LzL7WdC49xBYWRp+1Z+KiciO/1vEk7X/6QNGGdLkw93uoLrS0W3MHhkwskrGnSAMyVmI6pUh3nsOL2XfdXtcKCwZVZlWKD6JJq0ZBSyO9+gp7Z9ZRtnZKSYjDBDQSi7Tc9+0FBuoMrpAHuGSCpQFx4J0bSE5/hvjoRzVuhWTgEW2B1IHx8hoAQcMjvfjLRgZidY6f0SQ7XqdAqcAFEx28cnrsqn5EjDYjqYB0GENn6rd/er4+z73sMNzcObHFHhukawYRLvefAx6QFSApfPLCz3Zf7On+3WJB/Q4k0AFOICgm2Wp1wxZH2kP7C2SukDYJKnb7ceY1Pve84aQJ8c17YrS9wlxeXvyJtqNU79i92FpZmOa04Zucxath3+FPSBlRaoK62A90Xz4maVlar27xyJnngd6ZVNXuLEqZmBHlhZA7RwQJpAM4qKKLlEiQ9QMBm6PWP9KkNxGyYi1ND1AVvq1JFbZY0Ab+gfYd/plcRZ0pxFzNo9bsS1jEvT/MmrPMHyzr1aeEgfOi9c8QkG2dZg04uoAyxXziw6OWpWfLK4NgN6ThOkCY4FQ+C2z4SCrauvLN4mbRC0DStLXv6T3sX1trZihRXUf7lWtQPAqeYk8WVNEr29pOLpBVOQtjz4hjvwgKaWS3A4koWWooK+LBWztP9olGZUyNYgjA/U+DJtzGBQMXk7CotlcNfEaucLuVLrfAWvNiMNhHCRvALHXr9J5rNUjADO6T+g4/0FBXoUr7U+luCoFFeqxWYZ8HDYqIByV9UxGib/ghgrUAQi6VVXqsV+EXvfPkUW68QQVS2IHNUh46c0zunaIkiBSCYxQKaWy2X4tj3bAvGlRpqwFkK+anjJpSWoXTp4lSgFdLBhZX/IEfZ7CXSpH2/E2gG3L93ty0yFlgwICi4fRCUMVUvtdrObsW27QguLDB8coaEHv1aXmEL5g8EJjAawShBAUte1xcPBD7y9CYsDJ3JbFzSMfzeDSz/xhyLlK6k6QisE85QcPm0mqjklYABi0Z6ExbQaDZGEOAmIrkMVzHtSWa0zi+Vq3ZDotFFzh1mWXild2GB4ZNHdZno1AtILiPRPGrPFxw03l2EZULuqXzxOp2Rn1PRMdBDwKIRNcIy2CXshDtCbHw0Zw9y0X1LCdIP5fNr0s37lRTU/9C1tKUj4ALW63uCBiwaUSMsYLhL6AVnzJgU264npNC+6whP3sYwzCQBS4R2jcqXX9siqlz55v5ItlSjwAV0UScskBKX0C+u4JxJTNtsocGNhJVzJzQNbHuoZwFCMOu37twfn2Zv7biFz7+2P1/+8hvbKnETaAss65gMWBwiRagVVkpdQtXsaDq7IYDigoVs3zYJA7uYWSw9oCAK2IxaYQGDEsdMCrBoneq1IRXnqkaC1Qp2wl63amldS8ikiXpJtaiAv0ZHr6wtf0aDLw9Ie/g8MUxSsc9Vb4RiBNRbLJd636w9KophkohzrlIWrGgmPGFhim69tk+n6U5MSnDzVSGiPnjRzHPv56nef4kYJinUNmSw4s1QvanwLJbL5/IHsGo9l4gwjBKs+nTYogLhBC+aWfu4QoN7pX0UBWKYuLBbQd54hyIgGmGBteVVjhQysdFjf5Vfwj9jNTNyYkH+s/uJYaJCUcW6H6IXFhieQ9lTnhgmbDxuB1FN+MGLVtT793COiwkdXGO41mIgHosFnILdFbZcTCi4onK2kkZOfMICLC4mDGIWFYhXWIDFxagkAaIC8QvLhaOFTK/EEP1rR3R5rG6sLS9xEpkJjNMBfJASQnKEBewkMouL8YmT/P1HShDJEhZwxHVDiuslYpiuWEUpquOUMJJzxmoGVfG1/tM8P4Npid36cXdfFAW1QUiusADmZ2SyKywuZhN25K+2L4yWelUkW1guPFaNcUGQov7QbNzh9G7oISwwfGJanrtmiKc/pRNMU8Lgl4tvJO481Qp9hAXYNUwnCkc/R4VewnJh1zA9aOL6NaOnsABmxdez82y9DAVWCvt/Fc1Sj5p42kZUcP5gWUaG9thlLIxZOFZqSFdRAX0tViNsvcxAcyvViBnCchk+MSMjhyVi9MKO+NlW6rhuZ6l2mCUs4EQOpcCoSIwOlKlWm9Qp4ucF84TlMjQ3Kn+6BXYPE4s8I1PJBLevFeYKy2V4rij/nGGBJQSco4QU1IUDi2Qw5gvLhQUWLykRlEt6hOXCAouWlAnKJX3CcnEE9hbP2ggNo89Q3UivsFycIEeRo4iqsJaoLo6lVVAuLCwXJ0xfIHYT/WPvQLMWTMpD9QoLqxWuFSOakJ+5TaUVdlJXLMgz1FLarVMrWFjdyJ8cp4w1QSwyR0yCpKsn84NW/2W2Tu1hYfnhgSUrpMZdtN08sWRbJhaTZ1hYQcm/n6dMvxSaVSBLFIyxZrZVssryZ5IfGenm/fAaMb5hYanCEVpeXpTj8qLMaRPGh0USMjRuD2jZWE3q1CPdYGGFBWbSi41nHIEJKTQrLy/eXGwupC0gqyKtUFXeqdoiou9U2bULBxZWHMC6if7H5EUuQ/xWjjAgR9TlZ+G4k9Y98XUSoR2VI1cUCCrgdtX5mpDCkR9kyceFFFP2BgsoWn4Hsd8XLIySi38AAAAASUVORK5CYII="/>
+                                    </defs>
+                                    </svg>
+                                    `
+                res.online_chat_name = res.online_chat_name.length > 0? res.online_chat_name : "SaleBot"
+                res.online_chat_subtitle = res.online_chat_subtitle.length > 0? res.online_chat_subtitle : "Powered by SaleBot.pro"
+                let textAlign = "left"
+                if(res.online_chat_text_align === 1){
+                     textAlign = "center"
+                } else if (res.online_chat_text_align === 2) {
+                    textAlign = "right"
+                }
+                promptClass = res.online_chat_align === 1? "left_socialf5680be6-bee7-441a-a527-e1c12601863c" :"right_socialf5680be6-bee7-441a-a527-e1c12601863c"
+                let img = res.online_chat_avatar_display ? `<img class="prompt-head__avatar-img" alt="SaleBotPro" width="42" height="42" src="${res.online_chat_avatar}">` : `<div></div>`
+                promptDiv.innerHTML = `
+                <div class="prompt-body ${promptClass}" style="${bottomStyle};${alignStyle}">
+                    <div class="prompt-box">  
+                        <div class="prompt-head">
+                            <div class="prompt-head__avatar">
+                                ${img}
+                            </div>
+                            <div class="prompt-head__info" style="text-align: ${textAlign}">
+                                <div class="prompt-head__title">${res.online_chat_name}</div>
+                                <div class="prompt-head__subtitle">${res.online_chat_subtitle}</div>
+                            </div>
+                            <div class="prompt-head__close" id="prompt-head__close"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                            <path d="M1.53033 0.46967C1.23744 0.176777 0.762563 0.176777 0.46967 0.46967C0.176777 0.762563 0.176777 1.23744 0.46967 1.53033L1.53033 0.46967ZM10.4697 11.5303C10.7626 11.8232 11.2374 11.8232 11.5303 11.5303C11.8232 11.2374 11.8232 10.7626 11.5303 10.4697L10.4697 11.5303ZM11.5303 1.53033C11.8232 1.23744 11.8232 0.762563 11.5303 0.46967C11.2374 0.176777 10.7626 0.176777 10.4697 0.46967L11.5303 1.53033ZM0.46967 10.4697C0.176777 10.7626 0.176777 11.2374 0.46967 11.5303C0.762563 11.8232 1.23744 11.8232 1.53033 11.5303L0.46967 10.4697ZM0.46967 1.53033L10.4697 11.5303L11.5303 10.4697L1.53033 0.46967L0.46967 1.53033ZM10.4697 0.46967L0.46967 10.4697L1.53033 11.5303L11.5303 1.53033L10.4697 0.46967Z" fill="#B1C0D2"/>
+                                                            </svg>
+                                                            </div>
+                        </div>
+                        <div class="prompt-message"></div>
+                        <div class="prompt-buttons"></div>
+                    </div>
+                    <div class="prompt-field">
+                        <input class="prompt-field__input" id="prompt-field__input" type="text" placeholder="Введите сообщение">
+                        <button class="prompt-field__btn" id="prompt-field__btn">
+                            <svg width="10" height="14" viewBox="0 0 10 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M4.98618 1.58915L4.98618 12.4167M0.833374 5.92523L5.00004 1.58337L9.16671 5.92523" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                    </div> 
+                </div>`
+                function changeImgToSvg () {
+                    let img = document.querySelectorAll('.prompt-head__avatar-img')
+                    if(img) {
+                        img.forEach(item => {
+                            item.onerror = function () {
+                                if(res.online_chat_avatar_display) {
+                                    let parent = document.querySelector('.prompt-head__avatar')
+                                    let newDiv = document.createElement("div")
+                                    let svg = document.querySelector('.chat_svg_js')
+                                    if(!svg) {
+                                        newDiv.innerHTML  =`<div class="prompt-head__avatar-img chat_svg_js" style="width: 42px; height: 42px;">${svgRobotLight}</div>`
+                                        parent.append(newDiv)
+                                    }
+                                    img.forEach(img => {
+                                        img.remove()
+                                    })
+                                }
+                            }
+                        })
+                    }
+                }
+                changeImgToSvg ()
+                document.getElementById('prompt-head__close').addEventListener('click', function(e) {
+                    SaleBotPro.hidePrompt()
+                    let id = this.closest('.prompt-body').getAttribute('data-id')
+                    let date = new Date()
+                    localStorage.setItem(`i_frame_aa_${id}`, `${date}`)
+                })
+                promptMessage()
+            },
+            hidePrompt: function () {
+                if(document.getElementById("salebot_prompt_id")){
+                    document.getElementById("salebot_prompt_id").remove()
+                }
+            },
+            openByTime: function (time) {
+                return
+                if(sessionStorage.getItem("salebot_open_chat") == null){
+                    SaleBotPro.hidePrompt()
+                    sessionStorage.setItem("salebot_open_chat", "1")
+                    const v = document.getElementById('parent_frame').contentWindow;
+                    setTimeout(function (){
+                        v.postMessage('salebot_open_inner', `${domain_with_protocol}`);
+                    },time)
+                }
+            },
+            differentDomains: function (e) {
+                const v = document.getElementById('parent_frame').contentWindow;
+                const fullLocation = location.href
+                const origin = location.host
+                v.postMessage('salebot_save_location_' + fullLocation, `${domain_with_protocol}`);
+                v.postMessage('salebot_origin_' + origin, `${domain_with_protocol}`);
+                v.postMessage('salebot_different_domains_' + e, `${domain_with_protocol}`);
+            },
+            close: function () {
+                const v = document.getElementById('parent_frame').contentWindow;
+                const body = v.parentElement
+                v.postMessage('salebot_close_inner', `${domain_with_protocol}`);
+                const frame = document.getElementById('parent_frame');
+                if (newDesign) {
+                    frame.style.maxHeight = '0px'
+                } else {
+                    frame.style.maxHeight = '46px'
+                }
+            },
+            displayPrompt : function(bool) {
+                var element =  document.getElementById('salebot_prompt_id')
+                if(!element) return
+                if(bool) {
+                   element.animate({
+                        "opacity": "0"
+                    }, 200)
+                       .finished
+                       .then(function () {
+                       element.style.opacity = "0"
+                    });
+                } else {
+                    element.animate({
+                        "opacity": "1"
+                    }, 200)
+                        .finished
+                        .then(function () {
+                            element.style.opacity = "1"
+                        });
+                }
+            },
+
+            init: function (options) {
+                if (document.body != null) {
+                    initChat(options);
+                } else {
+                    //не все фреймворки вызывают это событие при переходе между старницами
+                    document.addEventListener("DOMContentLoaded", function (event) {
+                        initChat(options);
+                    });
+                }
+            }
+        };
+
+        function removeFirstWord(str) {
+            const indexOfSpace = str.indexOf(' ');
+
+            if (indexOfSpace === -1) {
+                return '';
+            }
+
+            return str.substring(indexOfSpace + 1);
+        }
+
+        function mobilecheck() {
+            var check = false;
+            (function (a) {
+                if (/(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino/i.test(a) || /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i.test(a.substr(0, 4))) check = true;
+            })(navigator.userAgent || navigator.vendor || window.opera);
+            return check;
+        }
+
+        function contrastingColor(color) {
+            return (luma(color) >= 165) ? 'black' : 'white';
+        }
+
+        function get_align(num) {
+            if(num == 0 || num == null){
+                return true
+            }else{
+                return false
+            }
+        }
+
+        function luma(color) // color can be a hx string or an array of RGB values 0-255
+        {
+            var rgb = (typeof color === 'string') ? hexToRGBArray(color) : color;
+            return (0.2126 * rgb[0]) + (0.7152 * rgb[1]) + (0.0722 * rgb[2]); // SMPTE C, Rec. 709 weightings
+        }
+
+        function hexToRGBArray(color) {
+            if (color.length === 3)
+                color = color.charAt(0) + color.charAt(0) + color.charAt(1) + color.charAt(1) + color.charAt(2) + color.charAt(2);
+            // else if (color.length !== 6)
+            //     throw('Invalid hex color: ' + color);
+            var rgb = [];
+            for (var i = 0; i <= 2; i++)
+                rgb[i] = parseInt(color.substr(i * 2, 2), 16);
+            return rgb;
+        }
+        function itemClick(item) {
+            let evt = new MouseEvent('click', {
+                bubbles: true,
+                cancelable: false,
+                view: window
+            });
+            item.dispatchEvent(evt)
+        }
+        function buttonsAction() {
+            let items = document.getElementsByClassName('salebot-message-btn')
+            if(items.length > 0) {
+                for (let item of items) {
+                    item.onclick = null
+                    item.onclick = function(e) {
+                        e.preventDefault();
+                        let message = this.getAttribute('href')
+                        let salebot = document.getElementById('parent_frame').contentWindow;
+                        salebot.postMessage(`salebot-message ${message}`, `${domain_with_protocol}`)
+                        SaleBotPro.open()
+                        let botPanel = document.getElementsByClassName('small_top_panel')[0]
+                        if(botPanel) itemClick(botPanel)
+                    }
+                }
+            }
+        }
+
+        function buttonHover () {
+            let parent = document.querySelector('.prompt-buttons')
+            if(parent) {
+                let btns = parent.getElementsByClassName('btn__link')
+                for(let item of btns) {
+                    ['mouseenter','mouseleave'].forEach(evt => {
+                            item.addEventListener(evt, function(e) {
+                                if (e.type === 'mouseenter') {
+                                    this.style.color = "#fff"
+                                    this.style.backgroundColor = `${this.getAttribute('data-color')}`
+                                }
+                                if (e.type === 'mouseleave') {
+                                    this.style.color = `${this.getAttribute('data-color')}`
+                                    this.style.backgroundColor = "#fff"
+                                }
+                            })
+                    })
+                }
+            }
+        }
+
+        function promptMessage() {
+            const input = document.getElementById('prompt-field__input')
+            const inputBtn = document.getElementById('prompt-field__btn')
+            input.addEventListener('keydown', function(e) {
+                if(e.keyCode === 13) {
+                    let message = this.value
+                    let salebot = document.getElementById('parent_frame').contentWindow;
+                    salebot.postMessage(`user-outside-message ${message}`, `${domain_with_protocol}`)
+                    SaleBotPro.open()
+                    let botPanel = document.getElementsByClassName('small_top_panel')[0]
+                    if(botPanel) itemClick(botPanel)
+                }
+            })
+            inputBtn.addEventListener('click', function(e) {
+                    let message = input.value
+                    let salebot = document.getElementById('parent_frame').contentWindow;
+                    salebot.postMessage(`user-outside-message ${message}`, `${domain_with_protocol}`)
+                    SaleBotPro.open()
+                    let botPanel = document.getElementsByClassName('small_top_panel')[0]
+                    if(botPanel) itemClick(botPanel)
+            })
+        }
+        function appendButtons(buttons) {
+            let btns = JSON.parse(buttons),
+                structuredBtns = [],
+                elem = document.getElementsByClassName('prompt-buttons')[0]
+            Object.keys(btns).map(function(item, index) {
+                item = btns[index]
+                structuredBtns[item.line] = structuredBtns[item.line] === undefined? [] : structuredBtns[item.line]
+                structuredBtns[item.line].push(item)
+            })
+            structuredBtns.forEach(function(item, index) {
+                let div = item.map(function(item) {
+                    if(item.type === "mailto:" || item.type === "tel:") item.data = item.type + item.data
+                    let message = item.type === "message"?  "salebot-message-btn" : ""
+                        return (`
+                           <div class="btn__inner"><a data-color="${item.color}" style="border-color: ${item.color}; color: ${item.color}" class="btn__link ${message}" href="${item.data}" target="_blank">${item.text}</a></div>
+                    `)
+                }).join('')
+                let newDiv = document.createElement("div")
+                newDiv.innerHTML = `<div class="buttons-block">${div}</div>`
+                elem.append(newDiv)
+            })
+            buttonsAction()
+            buttonHover()
+        }
+        function initChat(options) {
+
+            function messageCallBack (e) {
+                if(typeof e.data !== 'string')  return
+                const frame = document.getElementById('parent_frame');
+                SaleBotPro.createPrompt()
+                if (e.data == 'salebot_close_outer') {
+                    if (newDesign) {
+                        frame.style.maxHeight = '0px'
+                    } else {
+                        frame.style.maxHeight = '46px'
+                    }
+                    document.body.style.overflow = 'auto'
+                } else if (e.data == 'salebot_open_outer') {
+                    socialContainer.classList.remove('social_show-f5680be6')
+                    if (document.documentElement.clientHeight - 20 > 600) {
+                        ifrm.style.maxHeight = "620px";
+                    } else {
+                        ifrm.style.maxHeight = (document.documentElement.clientHeight) + 'px'
+                    }
+                    if (document.documentElement.clientWidth > 425) {
+                        ifrm.style.maxHeight = "620px";
+                    } else {
+                        ifrm.style.maxHeight = (document.documentElement.clientHeight) + 'px'
+                    }
+                    if(mobilecheck()){
+                        document.body.style.overflow = 'hidden'
+                    }
+                } else if ((typeof e.data === 'string' || e.data instanceof String) && e.data.startsWith('salebot_chat_open_by_time_')) {
+                    var timeOut = parseInt(e.data.substring(26))
+                    SaleBotPro.openByTime(timeOut)
+                } else if (e.data == 'salebot_chat_open_by_time') {
+                    SaleBotPro.differentDomains(diffDomains)
+                } else if (e.data == 'salebot_chat_location') {
+                    SaleBotPro.differentDomains(diffDomains)
+                } else if ((typeof e.data === 'string' || e.data instanceof String) &&
+                    e.data.startsWith('recipient_id')) {
+                    SaleBotPro.recipient_id = e.data.substring(12)
+                    var size = document.documentElement.clientHeight - 20;
+                    const v = document.getElementById('parent_frame').contentWindow;
+                    let urlForHref = document.location.href
+                    let storageItems = {}
+                    storageItems["urlForHref"] = urlForHref
+                    if(localStorage.length > 0) {
+                        Object.keys(localStorage).map(function(item, string) {
+                            if(item.includes('i_frame_aa_')) {
+                                let key = item.replace('i_frame_aa_', '')
+                                storageItems[key] = localStorage.getItem(`${item}`)
+                            }
+                        })
+                        v.postMessage(`localStorageNew ${JSON.stringify(storageItems)}`, `${domain_with_protocol}`);
+                        v.postMessage(`autoActionsReady aaaaa`, `${domain_with_protocol}`);
+                    } else {
+                        v.postMessage(`localStorageNew ${JSON.stringify(storageItems)}`, `${domain_with_protocol}`);
+                        v.postMessage(`autoActionsReady aaaaa`, `${domain_with_protocol}`);
+                    }
+                    if (size < 600) {
+                        v.postMessage('salebot_max_height_' + size + 'px', `${domain_with_protocol}`);
+                    }
+                } else if(e.data.startsWith('salebot_chat_prompt_')) {
+                    if(e.data.endsWith("true")){
+                        showPrompt = true
+                        if (!mobilecheck() && newDesign) {
+                            bottomStyle  = "bottom : 140px"
+                            alignStyle = get_align(res.online_chat_align)? "right : 15px" : "left : 15px"
+                        }
+                        if(res !==undefined) SaleBotPro.showPrompt(res, bottomStyle, alignStyle)
+                        SaleBotPro.displayPrompt(false)
+                    } else {
+                        SaleBotPro.hidePrompt()
+                    }
+                } else if(e.data.startsWith('salebot_chat_preview_')) {
+                    if(e.data.endsWith("true")){
+                        SaleBotPro.showPreview()
+                    } else {
+                        SaleBotPro.hidePreview()
+                    }
+                }else if(e.data.startsWith('prompt__message')) {
+                    var linkRegex = /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gm
+                    let text = removeFirstWord(e.data)
+                    text = text.replace(linkRegex, function(match) {
+                        return `<a class="link_no_style" href="${match}" target="_blank">${match}</a>`
+                    })
+                    let prompt = document.getElementsByClassName('prompt-message')[0]
+                    prompt.innerHTML = `${text}`
+                } else if(e.data.startsWith('prompt__buttons')) {
+                    appendButtons(removeFirstWord(e.data))
+                } else if(e.data.startsWith('prompt__id')) {
+                    document.getElementsByClassName('prompt-body')[0].setAttribute('data-id', (removeFirstWord(e.data)))
+                } else if(e.data.startsWith("localStorage_items")) {
+                    let stringArray = e.data.split('§±§'),
+                        func = stringArray[1],
+                        key = stringArray[2],
+                        value = stringArray[3],
+                        returnMsg = stringArray[4];
+                    storageFunctions['func_' + func](key, value, returnMsg)
+                } else if (e.data.startsWith('salebot_auto_action_open')) {
+                        let botPanel = document.getElementsByClassName('small_top_panel')[0]
+                        if(botPanel) itemClick(botPanel)
+                        SaleBotPro.open()
+                }
+            }
+            var storageFunctions = {
+                func_getStorageItem : function(key, value, returnMsg) {
+                    let storageItem = localStorage.getItem(`${key}`)
+                    let v = document.getElementById('parent_frame').contentWindow;
+                    return v.postMessage(`localStorageReturn ${returnMsg} ${storageItem} ${key}`, `${domain_with_protocol}`)
+                },
+                func_setStorageItem : function(key, value, returnMsg) {
+                    if(returnMsg === "inside_i_frame") {
+                        localStorage.setItem(`i_frame_aa_${key}`, `${value}`)
+                    } else {
+                        localStorage.setItem(`${key}`, `${value}`)
+                    }
+                },
+                func_removeStorageItem: function(key, value, returnMsg) {
+                    if(returnMsg === "inside_i_frame") {
+                        localStorage.removeItem(`i_frame_aa_${key}`)
+                    } else {
+                        localStorage.removeItem(`${key}`)
+                    }
+                }
+            }
+            window.onmessage = (e) => {messageCallBack(e)}
+            var diffDomains = false
+            var ifrm = document.createElement("iframe");
+            var ifrm_trigger = document.createElement("div");
+            var ifrm_trigger_img = `<svg style="cursor: pointer;height:30px;width:30px;margin:15px 20px;z-index: 2147483646;" xmlns="http://www.w3.org/2000/svg" width="31" height="33" viewBox="0 0 31 33" fill="none" id="union_svg_for_cursor">
+                                        <path id="union_svg_for_fill" fill-rule="evenodd" clip-rule="evenodd" d="M15.7403 2.80118C15.7403 3.47357 15.4094 4.06867 14.9015 4.43246L15.8373 7.7292C25.5934 7.85622 30.4535 12.8617 30.4535 23.2267C30.4535 30.2267 23.7378 32.2267 15.4535 32.2267C7.16919 32.2267 0.453491 29.8541 0.453491 23.2267C0.931809 12.7037 5.05934 8.12921 14.182 7.75226L13.3344 4.76638C12.419 4.58074 11.7299 3.77144 11.7299 2.80118C11.7299 1.69373 12.6276 0.795959 13.7351 0.795959C14.8425 0.795959 15.7403 1.69373 15.7403 2.80118ZM15.452 24.521C20.4226 24.521 26.8406 24.521 27.2467 20.1674C28.0349 11.7162 20.4226 9.57147 15.452 9.57147C10.4814 9.57147 3.32104 11.8281 3.6123 20.0392C3.75684 24.1174 10.4814 24.521 15.452 24.521ZM11.1695 13.8358C10.3778 13.8358 9.73608 14.4775 9.73608 15.2692V18.1383C9.73608 18.93 10.3778 19.5717 11.1695 19.5717C11.9611 19.5717 12.6029 18.93 12.6029 18.1383V15.2692C12.6029 14.4775 11.9611 13.8358 11.1695 13.8358ZM19.7806 13.8358C18.9889 13.8358 18.3472 14.4775 18.3472 15.2692V18.1383C18.3472 18.93 18.9889 19.5717 19.7806 19.5717C20.5722 19.5717 21.214 18.93 21.214 18.1383V15.2692C21.214 14.4775 20.5722 13.8358 19.7806 13.8358Z" fill="white"/>
+                                    </svg>`
+
+            var socialContainer = document.createElement("div");
+            var head = document.getElementsByTagName('head')[0];
+            var link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.type = 'text/css';
+            link.href = `${domain_with_protocol}/css/social.css`;
+            link.media = 'all';
+            head.appendChild(link);
+            socialContainer.setAttribute("class", "socialf5680be6-bee7-441a-a527-e1c12601863c"); // для сайта
+
+            let params;
+            if(options.onlineChatId){
+                params = `online_chat_id=${options.onlineChatId}`
+            }
+            if (options.projectId){
+                params = `project_id=${options.projectId}`
+            }
+            ifrm.setAttribute("id", "parent_frame");
+            ifrm.setAttribute("src", `${domain_with_protocol}/projects/online_chat/script?${params}`);
+            ifrm.setAttribute("frameborder", "0");
+            if (document.body.clientWidth > 425) {
+                ifrm.style.width = "360px";
+            } else {
+                ifrm.style.width = (document.body.clientWidth) + "px";
+            }
+            var xhr = new XMLHttpRequest();
+            xhr.open(
+                'GET',
+                `${domain_with_protocol}/projects/online_chat/script_settings?${params}`,
+                true
+            );
+            xhr.send();
+            xhr.onload = function (e) {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        res = JSON.parse(xhr.responseText);
+                        if (!mobilecheck() && newDesign) {
+                            bottomStyle  = "bottom : 140px"
+                            alignStyle = get_align(res.online_chat_align)? "right : 15px" : "left : 15px"
+                        }
+                        if(showPrompt) SaleBotPro.showPrompt(res, bottomStyle, alignStyle)
+                        socialContainer.setAttribute('id', 'salebot_social_contacts_container')
+                        if (res.online_chat_dont_show) {
+                            ifrm.style.display = 'none'
+                            SaleBotPro.hidePreview()
+                        }
+                        if(get_align(res.online_chat_align)){
+                            socialContainer.classList.add("right_socialf5680be6-bee7-441a-a527-e1c12601863c")
+                        }else{
+                            socialContainer.classList.add("left_socialf5680be6-bee7-441a-a527-e1c12601863c")
+                        }
+                        function timerrr() {
+                            setTimeout(function () {
+                                if (parseInt(ifrm.style.maxHeight) === 0) {
+                                    ifrm_trigger.style.width = "60px";
+                                    if(get_align(res.online_chat_align)){
+                                        ifrm_trigger.style.right = "0px";
+                                    }else{
+                                        ifrm_trigger.style.left = "0px";
+                                    }
+                                } else {
+                                    timerrr()
+                                }
+                            }, 1000)
+                        }
+                        diffDomains = res.online_chat_diff_domains
+                        if (mobilecheck() && res.online_chat_style == 1 || res.online_chat_style == 2) {
+                            newDesign = true
+                        }
+                        ifrm.style.height = "100%";
+                        ifrm.style.maxHeight = "46px";
+                        ifrm.style.position = "fixed";
+                        ifrm.style.transition = "all 200ms ease-out";
+                        ifrm.style.bottom = "0px";
+                        if(get_align(res.online_chat_align)){
+                            ifrm.style.right = "5%"
+                            if (document.body.clientWidth < 425) {
+                                ifrm.style.right = "0";
+                            }
+                        }else{
+                            ifrm.style.left = "5%"
+                            if (document.body.clientWidth < 425) {
+                                ifrm.style.left = "0";
+                            }
+                        }
+                        ifrm.style.boxShadow = "0 25px 50px -12px rgba(6, 25, 56, 0.25)";
+                        ifrm.style.zIndex = 2147483647;
+                        ifrm.style.borderRadius ="6px 6px 0 0";
+                        if (document.body.clientWidth < 425) {
+                            ifrm.style.borderRadius = "0";
+                        }
+
+                        if (newDesign) {
+                            ifrm.style.maxHeight = "0px";
+                            ifrm_trigger.style.background = "#1a53c6"
+                            ifrm_trigger.style.height = "64px";
+                            ifrm_trigger.style.width = "60px";
+                            ifrm_trigger.style.transition = "200ms";
+                            ifrm_trigger.style.position = "fixed";
+                            ifrm_trigger.style.boxShadow = "0px 25px 50px -12px rgba(6, 25, 56, 0.25)";
+                            ifrm_trigger.style.transition = "all 200ms ease-out";
+                            ifrm_trigger.style.bottom = "46px";
+                            if(get_align(res.online_chat_align)){
+                                ifrm_trigger.style.right = "0px";
+                                ifrm_trigger.style.borderTopLeftRadius = "50%";
+                                ifrm_trigger.style.borderBottomLeftRadius = "50%";
+                            }else{
+                                ifrm_trigger.style.left = "0px";
+                                ifrm_trigger.style.borderTopRightRadius = "50%";
+                                ifrm_trigger.style.borderBottomRightRadius = "50%";
+                            }
+                            ifrm_trigger.style.cursor = "pointer";
+                            ifrm_trigger.classList = "small_top_panel";
+                            ifrm_trigger.id = "small_preview_salebot";
+                            ifrm_trigger.style.zIndex = 2147483645;
+                            document.body.appendChild(ifrm_trigger);
+                            var is_avatar = !!res.online_chat_avatar
+                            if(is_avatar && res.online_chat_avatar_display){
+                                ifrm_trigger_img = `<div style="max-width:40px; min-width:40px; min-height:40px;max-height:40px; margin:10px;"><img src="${res.online_chat_avatar}" style="width:40px;height:40px;border-radius: 50%;object-fit: cover;"/></div>`
+                            }
+                            ifrm_trigger.innerHTML += ifrm_trigger_img;
+                            if (res.online_chat_first_main_color) {
+                                ifrm_trigger.style.background = res.online_chat_first_main_color
+                                if(!is_avatar) {
+                                    var pathElement = document.querySelector("#union_svg_for_fill")
+                                    pathElement.setAttribute("fill", contrastingColor(res.online_chat_first_main_color.split("#")[1]));
+                                }
+                            }
+                        }
+                        if(ifrm_trigger){
+                            if(!res.online_chat_avatar_display) {
+                                // $(ifrm_trigger).find('svg').hide()
+                                // console.log("hiding")
+                                // ifrm_trigger.querySelector('svg').style.display = "none"
+                                // console.log(ifrm_trigger.querySelectorAll('svg'))
+                                // пока не работает, какая-то трабла
+                            }
+                            ifrm_trigger.addEventListener("click", function () {
+                                if (ifrm.style.maxHeight == "0px") {
+                                    if(get_align(res.online_chat_align)){
+                                        ifrm_trigger.style.width = "0px";
+                                    }else{
+                                        ifrm_trigger.style.width = "0px";
+                                        ifrm_trigger.style.left = "-60px";
+                                    }
+                                    timerrr()
+                                }
+                                try{
+                                    SaleBotPro.open()
+                                } catch(e){
+                                    console.log("ERRR")
+                                    console.log(e)
+                                }
+                            })
+                        }
+                        document.body.appendChild(ifrm);
+                        if (!mobilecheck()) {
+                            document.body.appendChild(socialContainer);
+                        }
+                        if (!mobilecheck() && newDesign) {
+                            socialContainer.style.bottom = "140px"
+                            if(get_align(res.online_chat_align)){
+                                socialContainer.style.right = "15px"
+                            }else{
+                                socialContainer.style.left = "15px"
+                            }
+                        }
+                        let socialTimer;
+                        const hideSocial = () => {
+                            socialTimer = setTimeout(() => {
+                                socialContainer.classList.remove('social_show-f5680be6');
+                                SaleBotPro.displayPrompt(false)
+                            }, 200);
+                        };
+                        const showSocial = () => {
+                            const dropdownBlock = ifrm.style.maxHeight;
+                            var blockMaxHeight;
+                            if (!mobilecheck() && newDesign) {
+                                blockMaxHeight = "0px"
+                            } else {
+                                blockMaxHeight = "46px"
+                            }
+                            if (dropdownBlock === blockMaxHeight) {
+                                clearTimeout(socialTimer);
+                                socialTimer = setTimeout(() => {
+                                    socialContainer.classList.add('social_show-f5680be6');
+                                    SaleBotPro.displayPrompt(true)
+                                }, 150);
+                            } else {
+                                let body = document.getElementsByClassName('prompt-body')[0]
+                                if(body && get_align(res.online_chat_align)){
+                                    socialContainer.style.right = "5%"
+                                    body.style.right = "5%"
+                                }else if(body){
+                                    socialContainer.style.left = "5%"
+                                    body.style.left = "5%"
+                                }
+                                socialContainer.classList.remove('social_show-f5680be6');
+                            }
+                        };
+                        if (!mobilecheck() && newDesign) {
+                            ifrm_trigger.onmouseenter = () => showSocial();
+                            ifrm_trigger.onmouseleave = () => hideSocial();
+                            ifrm_trigger.addEventListener("click", function () {
+                                socialContainer.classList.remove('social_show-f5680be6');
+                            });
+                        } else {
+                            ifrm.onmouseenter = () => showSocial();
+                            ifrm.onmouseleave = () => hideSocial();
+                            ifrm.addEventListener("click", function () {
+                                socialContainer.classList.remove('social_show-f5680be6');
+                            });
+                        }
+                        socialContainer.onmouseenter = () => showSocial();
+                        socialContainer.onmouseleave = () => hideSocial();
+                        const messengers = res.messengers;
+                        const socialHtml = messengers? messengers.reduce((acc, item) => {
+                            var msngr;
+                            var msngr_name = ""
+                            var pristavka = res.online_chat_messengers_description != null && res.online_chat_messengers_description != "" ? res.online_chat_messengers_description : "Написать в "
+                            if (item.type == "tg") {
+                                msngr_name = " Telegram "
+                            } else if (item.type == "instagram") {
+                                msngr_name = " Instagram "
+                            } else if (item.type == "ok") {
+                                msngr_name = " Одноклассники "
+                            } else if (item.type == "vk") {
+                                msngr_name = " ВКонтакте "
+                            } else if (item.type == "whatsapp") {
+                                msngr_name = " WhatsApp "
+                            } else if (item.type == "fb") {
+                                msngr_name = " FaceBook "
+                            } else if (item.type == "viber") {
+                                msngr_name = " Viber "
+                            }
+                            if(res.online_chat_align == 2){
+                                msngr = msngr_name + " " +  pristavka
+                            } else {
+                                msngr = pristavka + " " +  msngr_name
+                            }
+                            return (acc + `
+                                    <div class="white_background_social_items-f5680be6">
+                                      <a href="${item.link}" target="_blank" class="social__link" ${res.online_chat_align == 2 ? 'justify-content: flex-end;':res.online_chat_align == 1 ? 'justify-content:center':''}">
+                                        <p class="online_chat_messenger_title-f5680be6" >${msngr}</p>
+                                        <div class="social__item-f5680be6 social__item_${item.type}-f5680be6 }">
+                                          <img class="social__icon-f5680be6" src="${domain_with_protocol}/images/social/${item.type}.svg" alt="${item.type}"/>
+                                        </div>
+                                      </a>
+                                    </div>`
+                            );
+                        }, '') : ``
+                        socialContainer.innerHTML = socialHtml;
+                    } else {
+                        console.error(xhr.statusText);
+                    }
+                }
+            };
+            xhr.onerror = function (e) {
+                console.error(xhr.statusText);
+            };
+        }
+    } catch(e) {
+        console.error("SALEBOT CHAT ERROR")
+        console.error(e)
+    }
+})
+();
