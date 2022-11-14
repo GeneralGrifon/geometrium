@@ -2958,7 +2958,7 @@
 
 	.video-wrap {
 		width: auto;
-		height: 100px;
+		height: 0px;
 		background-color: #00000000;
 
 	}
@@ -3524,7 +3524,12 @@
 											
 											>
 
-												<div class="wpb_wrapper">
+												<div class="wpb_wrapper"
+												style="width:100%;
+												
+												"
+												
+												>
 
 													<!-- <p>&nbsp;</p> -->
 													<h2></h2>
@@ -3537,13 +3542,20 @@
 													<!-- <p>&nbsp;</p> -->
 													<div class="video-wrap"
 													style="width: 98%;
+													height: 70%;
 													left:1%;
-													border-radius: 10px;
+													overflow: hidden;
+													display: flex;
+													justify-content: center;
+													align-items: center;
+													
 													"
 													>
 
-														<video controls="true" src="секта.mp4"
-														style="width: 100%"
+														<video controls="true" type="video/mp4" src="секта.mp4"
+														style="width: auto;
+														height: 700px;
+														"
 														></video>
 
 													</div>
